@@ -1,7 +1,14 @@
 from flask import Flask, render_template, request, jsonify
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
+import os
+import requests
 
+from dotenv import load_dotenv, dotenv_values
+load_dotenv()
+
+search_engine_id = "e5f41120b845448d0" #GSPE engine id code
+# input = "How much formula should I feed my six-month old baby?"
 app = Flask(__name__)
 
 @app.route('/')
@@ -12,30 +19,42 @@ def index():
 def chat():
     msg = request.form['msg']
     input = msg
-    response = get_Chat_Response(input)
+    #url for search engine
+    url = f"https://www.googleapis.com/customsearch/v1?q={input}&key={os.getenv('GSPE_ApiKey')}&cx={search_engine_id}"
+    search_engine_response = requests.get(url) #gets the website data from search engine
+    data = search_engine_response.json() #stores the website data 
+    response = get_Chat_Response(input, data)
     return jsonify({'response': response})
 
-def get_Chat_Response(text):
-    tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-medium")
-    model = AutoModelForCausalLM.from_pretrained("microsoft/DialoGPT-medium")
+def get_Chat_Response(input, data):
 
-    # Initialize chat history for the conversation
-    chat_history_ids = None  # Initialize chat history tensor
+    sources = titles = [item["title"]+"\n" for item in data.get("items", [])]
+    sources_string = " ".join(sources)
+    print("Sources string\n")
+    print(sources_string)
+    from google import genai
+    gemini_prompt = f"""
+    Answer the user's question first based off the resources listed below, 
+    and then using all sites, give another response, clarifying that the information 
+    in the second response is from outside resources:
 
-    # Let's chat for 5 lines
-    for step in range(5):
-        # encode the new user input, add the eos_token and return a tensor in Pytorch
-        new_user_input_ids = tokenizer.encode(str(text) + tokenizer.eos_token, return_tensors='pt')
+    {sources_string}
 
-        # append the new user input tokens to the chat history
-        bot_input_ids = torch.cat([chat_history_ids, new_user_input_ids], dim=-1) if step > 0 else new_user_input_ids
+    User Question: {input}
 
-        # Generate a response while limiting the total chat history to 1000 tokens
-        chat_history_ids = model.generate(bot_input_ids, max_length=1000, pad_token_id=tokenizer.eos_token_id)
+    If the user's question does not have any association with medical help, return a basic answer.
+    """
 
-    # Pretty print last output tokens from bot
-    return tokenizer.decode(chat_history_ids[:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True)
+    client = genai.Client(api_key=os.getenv("GEMINIAI_API_KEY"))
 
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=gemini_prompt,
+    )
+
+    if response and response.text:
+        return response.text
+    return "Sorry, I couldn't generate a response."
 
 if __name__ == "__main__":
     app.run(debug=True)
