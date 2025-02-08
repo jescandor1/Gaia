@@ -1,51 +1,56 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gaia</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <style>
-        .chat-container {
-            height: 60vh;
-            overflow-y: auto;
-        }
-        .message {
-            max-width: 80%;
-            margin-bottom: 10px;
-            padding: 8px 12px;
-            border-radius: 18px;
-        }
-        .user-message {
-            background-color: #e9d5ff;
-            color: #6b21a8;
-            margin-left: auto;
-        }
-        .ai-message {
-            background-color: #fbcfe8;
-            color: #831843;
-        }
-    </style>
-</head>
-<body class="bg-gradient-to-r from-pink-100 to-purple-100 min-h-screen flex items-center justify-center">
-    <div class="w-full max-w-2xl bg-white bg-opacity-80 rounded-lg shadow-xl p-6">
-        <h1 class="text-3xl text-center text-purple-700 mb-4">Mother Gaia</h1>
-        <div id="chat-container" class="chat-container mb-4"></div>
-        <form id="chat-form" class="flex space-x-2">
-            <input
-                type="text"
-                id="user-input"
-                placeholder="Ask anything about motherhood..."
-                class="flex-grow p-2 border border-gray-300 rounded"
-            >
-            <button
-                type="submit"
-                class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
-            >
-                Send
-            </button>
-        </form>
-    </div>
-    <script src="script.js"></script>
-</body>
-</html>
+document.addEventListener("DOMContentLoaded", () => {
+  const chatContainer = document.getElementById("chat-container");
+  const chatForm = document.getElementById("chat-form");
+  const userInput = document.getElementById("user-input");
+
+  chatForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const message = userInput.value.trim();
+    if (message) {
+      addMessage("user", message);
+      userInput.value = "";
+      await getAIResponse(message);
+    }
+  });
+
+  function addMessage(role, content) {
+    const messageDiv = document.createElement("div");
+    messageDiv.classList.add("message", role === "user" ? "user-message" : "ai-message");
+    messageDiv.textContent = content;
+    chatContainer.appendChild(messageDiv);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  }
+
+  async function getAIResponse(message) {
+    const typingIndicator = addTypingIndicator();
+    try {
+      const response = await fetch("/get", {  // Updated to match Flask route
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ msg: message }),  // Match the Flask request handler
+      });
+      const data = await response.json();
+      removeTypingIndicator(typingIndicator);
+      addMessage("ai", data.response);
+    } catch (error) {
+      console.error("Error:", error);
+      removeTypingIndicator(typingIndicator);
+      addMessage("ai", "Sorry, I encountered an error. Please try again.");
+    }
+  }
+
+  function addTypingIndicator() {
+    const typingDiv = document.createElement("div");
+    typingDiv.classList.add("message", "ai-message");
+    typingDiv.textContent = "AI is typing...";
+    chatContainer.appendChild(typingDiv);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    return typingDiv;
+  }
+
+  function removeTypingIndicator(typingDiv) {
+    chatContainer.removeChild(typingDiv);
+  }
+});
