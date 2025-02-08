@@ -20,10 +20,10 @@ export const useChat = () => {
     const typingIndicator = { id: Date.now() + 1, role: 'ai', content: 'AI is typing...' };
     setMessages((prevMessages) => [...prevMessages, typingIndicator]);
     try {
-      const response = await fetch('/chat', {
+      const response = await fetch('/get', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ msg: message }),
       });
       const data = await response.json();
       setMessages((prevMessages) => [
